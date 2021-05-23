@@ -1,63 +1,78 @@
-import dash
+import pandas as pd
+import plotly.express as px  # (version 4.7.0)
+import plotly.graph_objects as go
+
+import dash  # (version 1.12.0) pip install dash
 import dash_core_components as dcc
 import dash_html_components as html
-import plotly.graph_objs as go
+from dash.dependencies import Input, Output
 
-########### Define your variables
-beers=['Chesapeake Stout', 'Snake Dog IPA', 'Imperial Porter', 'Double Dog IPA']
-ibu_values=[35, 60, 85, 75]
-abv_values=[5.4, 7.1, 9.2, 4.3]
-color1='darkred'
-color2='orange'
-mytitle='Beer Comparison'
-tabtitle='beer!'
-myheading='Flying Dog Beers'
-label1='IBU'
-label2='ABV'
-githublink='https://github.com/austinlasseter/flying-dog-beers'
-sourceurl='https://www.flyingdog.com/beers/'
+app = dash.Dash(__name__)
 
-########### Set up the chart
-bitterness = go.Bar(
-    x=beers,
-    y=ibu_values,
-    name=label1,
-    marker={'color':color1}
-)
-alcohol = go.Bar(
-    x=beers,
-    y=abv_values,
-    name=label2,
-    marker={'color':color2}
-)
-
-beer_data = [bitterness, alcohol]
-beer_layout = go.Layout(
-    barmode='group',
-    title = mytitle
-)
-
-beer_fig = go.Figure(data=beer_data, layout=beer_layout)
+# ---------- Import and clean data (importing csv into pandas)
+df = pd.read_csv("https://raw.githubusercontent.com/Coding-with-Adam/Dash-by-Plotly/master/Other/Dash_Introduction/intro_bees.csv")
+df1 = df.groupby(['State', 'Year'])[['Pct of Colonies Impacted']].sum()
+df1.reset_index(inplace=True)
+df1 = df1.pivot(index = 'State', columns = 'Year', values = 'Pct of Colonies Impacted')
+print(df)
 
 
-########### Initiate the app
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-server = app.server
-app.title=tabtitle
+# ------------------------------------------------------------------------------
+# App layout
+app.layout = html.Div([
 
-########### Set up the layout
-app.layout = html.Div(children=[
-    html.H1(myheading),
-    dcc.Graph(
-        id='flyingdog',
-        figure=beer_fig
-    ),
-    html.A('Code on Github', href=githublink),
+    html.H1("Web Application Dashboards with Dash", style={'text-align': 'center'}),
+
+    dcc.Dropdown(id="slct_year",
+                 options=[
+                     {"label": "2015", "value": 2015},
+                     {"label": "2016", "value": 2016},
+                     {"label": "2017", "value": 2017},
+                     {"label": "2018", "value": 2018}],
+                 multi=False,
+                 value=2015,
+                 style={'width': "40%"}
+                 ),
+
+    html.Div(id='output_container', children=[]),
     html.Br(),
-    html.A('Data Source', href=sourceurl),
-    ]
-)
 
+    dcc.Graph(id='my_bee_map', figure={})
+
+])
+
+
+# ------------------------------------------------------------------------------
+# Connect the Plotly graphs with Dash Components
+@app.callback(
+    [Output(component_id='output_container', component_property='children'),
+     Output(component_id='my_bee_map', component_property='figure')],
+    [Input(component_id='slct_year', component_property='value')]
+)
+def update_graph(option_slctd):
+    print(option_slctd)
+    print(type(option_slctd))
+
+    container = "The year chosen by user was: {}".format(option_slctd)
+
+    dff = df.copy()
+    df2 = df["Year"] == option_slctd
+    dff = dff[dff["Affected by"] == "Varroa_mites"]
+
+    # Plotly Express
+    fig = px.imshow(df1, color_continuous_scale=px.colors.sequential.YlOrBr,
+                title="test")
+    fig.update_layout(title_font={'size':27}, title_x=0.5)
+    fig.update_traces(hoverongaps=False,
+                  hovertemplate="State: %{y}"
+                                "<br>Year: %{x}"
+                                "<br>Affected by Sum %: %{z}<extra></extra>"
+                  )
+
+   
+    return container, fig
+
+
+# ------------------------------------------------------------------------------
 if __name__ == '__main__':
-    app.run_server()
+    app.run_server(debug=False)
